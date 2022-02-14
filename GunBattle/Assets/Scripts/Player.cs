@@ -51,6 +51,8 @@ public class Player : NetworkBehaviour
     [SerializeField]
     private AudioClip destroySound;
 
+    [Command(ignoreAuthority = true)]
+
     private void CmdBroadcastNewPlayerSetup()
     {
         RpcSetupPlayerOnAllClients();
