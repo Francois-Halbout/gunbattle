@@ -1,7 +1,6 @@
 // kcp client logic abstracted into a class.
 // for use in Mirror, DOTSNET, testing, etc.
 using System;
-using UnityEngine;
 
 namespace kcp2k
 {
@@ -9,61 +8,87 @@ namespace kcp2k
     {
         // events
         public Action OnConnected;
-        public Action<ArraySegment<byte>> OnData;
+        public Action<ArraySegment<byte>, KcpChannel> OnData;
         public Action OnDisconnected;
 
         // state
         public KcpClientConnection connection;
         public bool connected;
 
-        public KcpClient(Action OnConnected, Action<ArraySegment<byte>> OnData, Action OnDisconnected)
+        public KcpClient(Action OnConnected, Action<ArraySegment<byte>, KcpChannel> OnData, Action OnDisconnected)
         {
             this.OnConnected = OnConnected;
             this.OnData = OnData;
             this.OnDisconnected = OnDisconnected;
         }
 
-        public void Connect(string address, ushort port, bool noDelay, uint interval, int fastResend = 0, bool congestionWindow = true, uint sendWindowSize = Kcp.WND_SND, uint receiveWindowSize = Kcp.WND_RCV)
+        // CreateConnection can be overwritten for where-allocation:
+        // https://github.com/vis2k/where-allocation
+        protected virtual KcpClientConnection CreateConnection() =>
+            new KcpClientConnection();
+
+        public void Connect(string address,
+                            ushort port,
+                            bool noDelay,
+                            uint interval,
+                            int fastResend = 0,
+                            bool congestionWindow = true,
+                            uint sendWindowSize = Kcp.WND_SND,
+                            uint receiveWindowSize = Kcp.WND_RCV,
+                            int timeout = KcpConnection.DEFAULT_TIMEOUT,
+                            uint maxRetransmits = Kcp.DEADLINK,
+                            bool maximizeSendReceiveBuffersToOSLimit = false)
         {
             if (connected)
             {
-                Debug.LogWarning("KCP: client already connected!");
+                Log.Warning("KCP: client already connected!");
                 return;
             }
 
-            connection = new KcpClientConnection();
+            // create connection
+            connection = CreateConnection();
 
             // setup events
             connection.OnAuthenticated = () =>
             {
-                Debug.Log($"KCP: OnClientConnected");
+                Log.Info($"KCP: OnClientConnected");
                 connected = true;
                 OnConnected.Invoke();
             };
-            connection.OnData = (message) =>
+            connection.OnData = (message, channel) =>
             {
-                //Debug.Log($"KCP: OnClientData({BitConverter.ToString(message.Array, message.Offset, message.Count)})");
-                OnData.Invoke(message);
+                //Log.Debug($"KCP: OnClientData({BitConverter.ToString(message.Array, message.Offset, message.Count)})");
+                OnData.Invoke(message, channel);
             };
             connection.OnDisconnected = () =>
             {
-                Debug.Log($"KCP: OnClientDisconnected");
+                Log.Info($"KCP: OnClientDisconnected");
                 connected = false;
                 connection = null;
                 OnDisconnected.Invoke();
             };
 
             // connect
-            connection.Connect(address, port, noDelay, interval, fastResend, congestionWindow, sendWindowSize, receiveWindowSize);
+            connection.Connect(address,
+                               port,
+                               noDelay,
+                               interval,
+                               fastResend,
+                               congestionWindow,
+                               sendWindowSize,
+                               receiveWindowSize,
+                               timeout,
+                               maxRetransmits,
+                               maximizeSendReceiveBuffersToOSLimit);
         }
 
-        public void Send(ArraySegment<byte> segment)
+        public void Send(ArraySegment<byte> segment, KcpChannel channel)
         {
             if (connected)
             {
-                connection.Send(segment);
+                connection.SendData(segment, channel);
             }
-            else Debug.LogWarning("KCP: can't send because client not connected!");
+            else Log.Warning("KCP: can't send because client not connected!");
         }
 
         public void Disconnect()
@@ -80,16 +105,31 @@ namespace kcp2k
             }
         }
 
+        // process incoming messages. should be called before updating the world.
+        public void TickIncoming()
+        {
+            // recv on socket first, then process incoming
+            // (even if we didn't receive anything. need to tick ping etc.)
+            // (connection is null if not active)
+            connection?.RawReceive();
+            connection?.TickIncoming();
+        }
+
+        // process outgoing messages. should be called after updating the world.
+        public void TickOutgoing()
+        {
+            // process outgoing
+            // (connection is null if not active)
+            connection?.TickOutgoing();
+        }
+
+        // process incoming and outgoing for convenience
+        // => ideally call ProcessIncoming() before updating the world and
+        //    ProcessOutgoing() after updating the world for minimum latency
         public void Tick()
         {
-            // tick client connection
-            if (connection != null)
-            {
-                // recv on socket first
-                connection.RawReceive();
-                // then update
-                connection.Tick();
-            }
+            TickIncoming();
+            TickOutgoing();
         }
     }
 }

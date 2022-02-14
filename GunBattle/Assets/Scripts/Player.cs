@@ -51,6 +51,10 @@ public class Player : NetworkBehaviour
     [SerializeField]
     private AudioClip destroySound;
 
+    private void CmdBroadcastNewPlayerSetup()
+    {
+        RpcSetupPlayerOnAllClients();
+    }
     public void Setup()
     {
         if(isLocalPlayer)
@@ -63,11 +67,7 @@ public class Player : NetworkBehaviour
         CmdBroadcastNewPlayerSetup();
     }
 
-    [Command(ignoreAuthority = true)]
-    private void CmdBroadcastNewPlayerSetup()
-    {
-        RpcSetupPlayerOnAllClients();
-    }
+    
 
     [ClientRpc]
     private void RpcSetupPlayerOnAllClients()

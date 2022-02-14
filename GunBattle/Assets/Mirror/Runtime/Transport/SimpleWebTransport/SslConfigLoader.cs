@@ -12,7 +12,7 @@ namespace Mirror.SimpleWeb
         }
         internal static SslConfig Load(SimpleWebTransport transport)
         {
-            // dont need to load anything if ssl is not enabled
+            // don't need to load anything if ssl is not enabled
             if (!transport.sslEnabled)
                 return default;
 
@@ -33,11 +33,11 @@ namespace Mirror.SimpleWeb
             string json = File.ReadAllText(certJsonPath);
             Cert cert = JsonUtility.FromJson<Cert>(json);
 
-            if (string.IsNullOrEmpty(cert.path))
+            if (string.IsNullOrWhiteSpace(cert.path))
             {
-                throw new InvalidDataException("Cert Json didnt not contain \"path\"");
+                throw new InvalidDataException("Cert Json didn't not contain \"path\"");
             }
-            if (string.IsNullOrEmpty(cert.password))
+            if (string.IsNullOrWhiteSpace(cert.password))
             {
                 // password can be empty
                 cert.password = string.Empty;

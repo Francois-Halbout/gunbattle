@@ -1,33 +1,35 @@
 using UnityEngine;
 
 /*
-	Documentation: https://mirror-networking.com/docs/Components/NetworkManager.html
+	Documentation: https://mirror-networking.gitbook.io/docs/components/network-manager
 	API Reference: https://mirror-networking.com/docs/api/Mirror.NetworkManager.html
 */
 
 namespace Mirror.Examples.Basic
 {
+    [AddComponentMenu("")]
     public class BasicNetManager : NetworkManager
     {
-        // Sequential index used in round-robin deployment of players into instances and score positioning
-        int clientIndex;
-
         /// <summary>
-        /// Called on the server when a client adds a new player with ClientScene.AddPlayer.
+        /// Called on the server when a client adds a new player with NetworkClient.AddPlayer.
         /// <para>The default implementation for this function creates a new player object from the playerPrefab.</para>
         /// </summary>
         /// <param name="conn">Connection from client.</param>
         public override void OnServerAddPlayer(NetworkConnection conn)
         {
-            GameObject go = Instantiate(playerPrefab);
-            Player player = go.GetComponent<Player>();
-            player.playerColor = Random.ColorHSV(0f, 1f, 0.9f, 0.9f, 1f, 1f);
-            player.playerNumber = clientIndex;
+            base.OnServerAddPlayer(conn);
+            Player.ResetPlayerNumbers();
+        }
 
-            // increment the index after setting on player, so first player starts at 0
-            clientIndex++;
-
-            NetworkServer.AddPlayerForConnection(conn, go);
+        /// <summary>
+        /// Called on the server when a client disconnects.
+        /// <para>This is called on the Server when a Client disconnects from the Server. Use an override to decide what should happen when a disconnection is detected.</para>
+        /// </summary>
+        /// <param name="conn">Connection from client.</param>
+        public override void OnServerDisconnect(NetworkConnection conn)
+        {
+            base.OnServerDisconnect(conn);
+            Player.ResetPlayerNumbers();
         }
     }
 }
